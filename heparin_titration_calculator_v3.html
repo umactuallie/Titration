@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heparin Titration Calculator</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            max-width: 450px; 
+            margin: 40px auto; 
+            padding: 20px; 
+            background-color: #f4f7f6;
+        }
+        .app-container {
+            background-color: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        h2 { margin-top: 0; color: #333; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; font-size: 14px; }
+        input { 
+            width: 100%; 
+            padding: 10px; 
+            box-sizing: border-box; 
+            border: 1px solid #ccc; 
+            border-radius: 6px; 
+            font-size: 16px;
+        }
+        .bag-group {
+            display: flex;
+            gap: 10px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+        }
+        .bag-group .form-group { margin-bottom: 0; flex: 1; }
+
+        #result { 
+            margin-top: 20px; 
+            padding: 15px; 
+            border-radius: 6px;
+            display: none; 
+            color: #333;
+            font-size: 16px;
+            border: 2px solid transparent;
+        }
+        .zone-green { background-color: #e8f5e9; border-color: #4caf50; }
+        .zone-yellow { background-color: #fffde7; border-color: #ffeb3b; }
+        .zone-red { background-color: #ffebee; border-color: #f44336; }
+
+        @keyframes flash {
+            0% { background-color: #ff0000; color: white; }
+            50% { background-color: #ffebee; color: #d32f2f; }
+            100% { background-color: #ff0000; color: white; }
+        }
+        .flashing-warning {
+            animation: flash 1s infinite;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            text-transform: uppercase;
+        }
+
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: #0066cc;
+            text-decoration: underline;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        #nomogram-ref {
+            display: none;
+            margin-top: 15px;
+            font-size: 12px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        #nomogram-ref th, #nomogram-ref td {
+            border: 1px solid #ccc;
+            padding: 6px;
+            text-align: center;
+        }
+        #nomogram-ref th { background-color: #eee; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <h2>Heparin Titration</h2>
+
+        <label>IV Bag Concentration</label>
+        <div class="bag-group">
+            <div class="form-group">
+                <input type="number" id="bagUnits" value="25000" oninput="calculateHeparin()">
+                <div style="font-size: 12px; color: #777; margin-top: 4px;">Units</div>
+            </div>
+            <div class="form-group">
+                <input type="number" id="bagVol" value="250" oninput="calculateHeparin()">
+                <div style="font-size: 12px; color: #777; margin-top: 4px;">mL</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="weight">Patient Weight (kg)</label>
+            <input type="number" id="weight" step="0.1" placeholder="e.g., 80" oninput="calculateHeparin()">
+        </div>
+
+        <div class="form-group">
+            <label for="aptt">Current aPTT (seconds)</label>
+            <input type="number" id="aptt" step="0.1" placeholder="e.g., 32" oninput="calculateHeparin()">
+        </div>
+
+        <div class="form-group">
+            <label for="currentRate">Current Rate (units/hr)</label>
+            <input type="number" id="currentRate" step="1" placeholder="e.g., 1200" oninput="calculateHeparin()">
+        </div>
+
+        <div id="result"></div>
+
+        <button class="toggle-btn" onclick="toggleNomogram()">🧠 Show/Hide Nomogram Reference</button>
+        <table id="nomogram-ref">
+            <tr><th>aPTT</th><th>Bolus</th><th>Hold</th><th>Rate Change</th></tr>
+            <tr><td>&lt; 35</td><td>80 units/kg</td><td>No</td><td>+4 units/kg/hr</td></tr>
+            <tr><td>35 - 45</td><td>40 units/kg</td><td>No</td><td>+2 units/kg/hr</td></tr>
+            <tr><td>46 - 70</td><td>None</td><td>No</td><td>No Change</td></tr>
+            <tr><td>71 - 90</td><td>None</td><td>No</td><td>-2 units/kg/hr</td></tr>
+            <tr><td>&gt; 90</td><td>None</td><td>60 min</td><td>-3 units/kg/hr</td></tr>
+        </table>
+    </div>
+
+    <script>
+        function toggleNomogram() {
+            const table = document.getElementById('nomogram-ref');
+            table.style.display = (table.style.display === 'table') ? 'none' : 'table';
+        }
+
+        function calculateHeparin() {
+            const bagUnits = parseFloat(document.getElementById('bagUnits').value);
+            const bagVol = parseFloat(document.getElementById('bagVol').value);
+            const weight = parseFloat(document.getElementById('weight').value);
+            const aptt = parseFloat(document.getElementById('aptt').value);
+            const currentRate = parseFloat(document.getElementById('currentRate').value);
+            const resultDiv = document.getElementById('result');
+
+            if (isNaN(weight) || isNaN(aptt) || isNaN(currentRate) || isNaN(bagUnits) || isNaN(bagVol) || bagVol === 0) {
+                resultDiv.style.display = 'none';
+                return;
+            }
+
+            const concentration = bagUnits / bagVol;
+
+            let bolus = 0;
+            let rateChange = 0;
+            let holdTime = 0;
+            let message = "";
+            let zoneClass = "";
+            let flashHtml = "";
+            let emoji = "";
+
+            if (aptt < 35) {
+                bolus = 80 * weight;
+                rateChange = 4 * weight;
+                message = "Subtherapeutic. Increase rate and give bolus.";
+                zoneClass = "zone-red";
+                emoji = "🔴";
+            } else if (aptt >= 35 && aptt <= 45) {
+                bolus = 40 * weight;
+                rateChange = 2 * weight;
+                message = "Low range. Increase rate and give small bolus.";
+                zoneClass = "zone-yellow";
+                emoji = "🟡";
+            } else if (aptt >= 46 && aptt <= 70) {
+                bolus = 0;
+                rateChange = 0;
+                message = "Therapeutic range. No change needed.";
+                zoneClass = "zone-green";
+                emoji = "🟢";
+            } else if (aptt >= 71 && aptt <= 90) {
+                bolus = 0;
+                rateChange = -2 * weight;
+                message = "High range. Decrease rate.";
+                zoneClass = "zone-yellow";
+                emoji = "🟡";
+            } else {
+                bolus = 0;
+                rateChange = -3 * weight;
+                holdTime = 60;
+                message = "Supratherapeutic. Hold infusion, then decrease rate.";
+                zoneClass = "zone-red";
+                emoji = "🔴";
+                flashHtml = `<div class="flashing-warning">🚨 HOLD INFUSION FOR 60 MIN 🚨</div>`;
+            }
+
+            let newRateUnits = currentRate + rateChange;
+            if (newRateUnits < 0) newRateUnits = 0;
+            let newRateML = newRateUnits / concentration;
+
+            resultDiv.style.display = 'block';
+            resultDiv.className = zoneClass;
+
+            resultDiv.innerHTML = `
+                ${flashHtml}
+                <strong>${emoji} Status:</strong> ${message}<br><br>
+                <strong>Bolus to Give:</strong> ${Math.round(bolus)} units<br>
+                <strong>Hold Infusion For:</strong> ${holdTime} minutes<br>
+                <hr style="border:0; border-top:1px solid rgba(0,0,0,0.1); margin: 15px 0;">
+                <strong>New Rate (Units):</strong> ${newRateUnits.toFixed(1)} units/hr<br>
+                <strong style="font-size: 1.2em; color: #0066cc;">Pump Rate (Volume): ${newRateML.toFixed(1)} mL/hr</strong>
+            `;
+        }
+    </script>
+</body>
+</html>
